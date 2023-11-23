@@ -1,32 +1,40 @@
 #include "functions.h"
 
-
 void clockInit(void)
 {
-	// enable clocks for USART2, port A and B
+	// enable clocks for USART2, port A and B, AFIO
 	RCC->APB1ENR |= RCC_APB1ENR_USART2EN;
 	RCC->APB2ENR |= RCC_APB2ENR_IOPAEN;
 	RCC->APB2ENR |= RCC_APB2ENR_IOPBEN;
+	RCC->APB2ENR |= RCC_APB2ENR_AFIOEN;
 	
-	// get A5 to output, push pull
+	// Set A0, A1, A6, A7 to input
+	GPIOA->CRL &= ~GPIO_CRL_MODE0 & ~GPIO_CRL_MODE1 & ~GPIO_CRL_MODE6 & ~GPIO_CRL_MODE7;
+	GPIOA->CRL |= GPIO_CRL_CNF0_1 | GPIO_CRL_CNF1_1  | GPIO_CRL_CNF6_1 | GPIO_CRL_CNF7_1;
+	GPIOA->CRL &= ~GPIO_CRL_CNF0_0 & ~GPIO_CRL_CNF1_0 & ~GPIO_CRL_CNF6_0 & ~GPIO_CRL_CNF7_0;
+	
+	// A5 as output
 	GPIOA->CRL |= GPIO_CRL_MODE5;
 	GPIOA->CRL &= ~GPIO_CRL_CNF5;
 	
-	// Set A8 A9 A10 to input
-	GPIOA->CRH &= ~GPIO_CRH_MODE8 & ~GPIO_CRH_MODE9 & ~GPIO_CRH_MODE10;
-	GPIOA->CRH |= GPIO_CRH_CNF8_1 | GPIO_CRH_CNF9_1 | GPIO_CRH_CNF10_1;
-	GPIOA->CRH &= ~GPIO_CRH_CNF8_0 & ~GPIO_CRH_CNF9_0 & ~GPIO_CRH_CNF10_0;
+	// B0, B5 as input
+	GPIOB->CRL &= ~GPIO_CRL_MODE0 & ~GPIO_CRL_MODE5;
+	GPIOB->CRL |= GPIO_CRL_CNF0_1 | GPIO_CRL_CNF5_1;
+	GPIOB->CRL &= ~GPIO_CRL_CNF0_0 & ~GPIO_CRL_CNF5_0;
 	
-	// B8, B9, B10 as input
-	GPIOB->CRH &= ~GPIO_CRH_MODE8 & ~GPIO_CRH_MODE9 & ~GPIO_CRH_MODE10;
-	GPIOB->CRH |= GPIO_CRH_CNF8_1 | GPIO_CRH_CNF9_1 | GPIO_CRH_CNF10_1;
-	GPIOB->CRH &= ~GPIO_CRH_CNF8_0 & ~GPIO_CRH_CNF9_0 & ~GPIO_CRH_CNF10_0;
+	// Set A4 as hardware interrupt
+	// generate interrupt on rising edge
+	GPIOA->CRL |= GPIO_CRL_MODE4;
+	GPIOA->CRL |= GPIO_CRL_CNF4_1;
+	GPIOA->CRL &= ~GPIO_CRL_CNF4_0;
 	
-	// B6 as input
-	GPIOB->CRL &= ~GPIO_CRL_MODE6;
-	GPIOB->CRL |= GPIO_CRL_CNF6_1;
-	GPIOB->CRL &= ~GPIO_CRL_CNF6_0;
-
+	AFIO->EXTICR[0] &= ~AFIO_EXTICR2_EXTI4;
+	AFIO->EXTICR[0] |= AFIO_EXTICR2_EXTI4_PB;
+	EXTI->IMR |= EXTI_IMR_MR4;
+	EXTI->RTSR |= EXTI_RTSR_TR4;
+	EXTI->FTSR &= ~EXTI_FTSR_TR4;
+	NVIC_SetPriority(EXTI4_IRQn, 0);
+	NVIC_EnableIRQ(EXTI4_IRQn);
 }
 
 void usart2Init(void)
@@ -89,6 +97,7 @@ int sendByte(uint8_t b)
 	}
 	return -1;
 }
+
 void CLI_Transmit(uint8_t *pData, uint16_t Size)
 {
 		for (int i = 0; i < Size; i++)
@@ -100,10 +109,8 @@ void CLI_Transmit(uint8_t *pData, uint16_t Size)
 		}
 }
 
-
 void setupScreen(void)
 {
-		
 	// clear screen
 	uint8_t clear[] = "\x1b[2J";
 	CLI_Transmit(clear, sizeof(clear));
@@ -114,7 +121,7 @@ void setupScreen(void)
 	
 	// create current floor message
 	uint8_t currFloor[] = "1     2     3     4\r\n"
-											"^                      ";
+											  "^                  \r\n";
 	CLI_Transmit(currFloor, sizeof(currFloor));
 	
 	// set cursor to third row
@@ -122,7 +129,7 @@ void setupScreen(void)
 	CLI_Transmit(moveToThird, sizeof(moveToThird));
 	
 	// create destination floor message
-	uint8_t destFloor[] = "Destination:";
+	uint8_t destFloor[] = "Destination: 1";
 	CLI_Transmit(destFloor, sizeof(destFloor));
 	
 	// set cursor to fourth row
@@ -130,27 +137,25 @@ void setupScreen(void)
 	CLI_Transmit(moveToFourth, sizeof(moveToFourth));
 	
 	// create direction message
-	uint8_t direction[] = "Direction:";
-	CLI_Transmit(direction, sizeof(direction));
+	uint8_t doors[] = "Doors: Open";
+	CLI_Transmit(doors, sizeof(doors));
 	
 	// set cursor to fifth row
 	uint8_t moveToFifth[] = "\x1b[5;0H";
 	CLI_Transmit(moveToFifth, sizeof(moveToFifth));
 	
 	// create state message
-	uint8_t state[] = "State:";
+	uint8_t state[] = "State: Normal";
 	CLI_Transmit(state, sizeof(state));
 	
 	// set cursor to 8,0
 	uint8_t moveCommandLine[] = "\x1b[8;0H";
 	CLI_Transmit(moveCommandLine, sizeof(moveCommandLine));
-
 }
-
 
 void welcomeScreen(void)
 {
-		char message[] = "\n\rWelcome to the STM32F103RB CLI!\n\r"
+		char message[] = "\n\rWelcome to the Elevator!\n\r"
 										"Type \"help\" for help\n\r";
 		for (int i = 0; i < sizeof(message); i++)
 		{
@@ -160,4 +165,3 @@ void welcomeScreen(void)
 			// wait for transmission to be complete
 		}
 }
-
