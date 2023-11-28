@@ -108,17 +108,17 @@ static void vInput( void * parameters)
 			if (curr == 2)
 			{
 				uint8_t dest = 1;
-				xQueueSend(xDestinationFloor, (void *) &dest, 10);
+				xQueueSend(xDestinationFloor, (void *) &dest, 1);
 			}
 			else if (curr == 3)
 			{
 				uint8_t dest = 2;
-				xQueueSend(xDestinationFloor, (void *) &dest, 10);
+				xQueueSend(xDestinationFloor, (void *) &dest, 1);
 			}
 			else if (curr == 4)
 			{
 				uint8_t dest = 3;
-				xQueueSend(xDestinationFloor, (void *) &dest, 10);
+				xQueueSend(xDestinationFloor, (void *) &dest, 1);
 			}
 			uint8_t message[] = "\r\n DOWN \r\n";
 			CLI_Transmit(message, sizeof(message));
@@ -180,7 +180,7 @@ static void processMessage( void * parameters )
 			// move the contents of the message queue into the temp array
 			for (int i = 0; uxQueueMessagesWaiting(xQueueMessage) > 0; i++)
 			{
-				xQueueReceive(xQueueMessage, &temp[5-i], 10);
+				xQueueReceive(xQueueMessage, &temp[5-i], 1);
 			}
 			CLI_Process(temp);
 		}
@@ -201,19 +201,19 @@ static void moveFloors( void * parameters)
 			
 			// receive the destination and put into dest variable
 			uint8_t dest;
-			xQueueReceive(xDestinationFloor, (void *) &dest, 10);
+			xQueueReceive(xDestinationFloor, (void *) &dest, 1);
 			
 			// get current floor to compare to to destination floor
 			uint8_t curr;
-			xQueueReceive(xCurrentFloor, (void *) &curr, 10);
+			xQueueReceive(xCurrentFloor, (void *) &curr, 1);
 			// move up if destination is higher than curr
 			if (curr < dest)
 			{
 				closeDoors();
 				vTaskDelay(1000); // delay to simulate closing doors before moving
 				curr += 1;
-				xQueueSend(xCurrentFloor, (void *) &curr, 10);
-				xQueueSendToFront(xDestinationFloor, (void *) &dest, 0);
+				xQueueSend(xCurrentFloor, (void *) &curr, 1);
+				xQueueSendToFront(xDestinationFloor, (void *) &dest, 1);
 			}
 			// move down if destination is lower than curr
 			else if (curr > dest)
@@ -221,13 +221,13 @@ static void moveFloors( void * parameters)
 				closeDoors();
 				vTaskDelay(1000); // delay to simulate closing doors before moving
 				curr -= 1;
-				xQueueSend(xCurrentFloor, (void *) &curr, 10);
-				xQueueSendToFront(xDestinationFloor, (void *) &dest, 0);
+				xQueueSend(xCurrentFloor, (void *) &curr, 1);
+				xQueueSendToFront(xDestinationFloor, (void *) &dest, 1);
 			}
 			// we are at the destination floor
 			else
 			{
-				xQueueSend(xCurrentFloor, (void *) &curr, 10);
+				xQueueSend(xCurrentFloor, (void *) &curr, 1);
 				openDoors();
 				vTaskDelay(1000); // delay to simulate opening doors before moving
 			}
